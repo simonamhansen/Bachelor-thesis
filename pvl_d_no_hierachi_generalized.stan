@@ -1,0 +1,212 @@
+// PVL-Delta in Stan
+data {
+  int<lower=1> n_s;                       // subjects
+  int<lower=1> n_t;                       // trials
+  int<lower=0,upper=4> choice[n_s, n_t];  //subj. x trials matrix w choices
+  real<lower=0> loss[n_s, n_t];           // Losses
+  real<lower=0,upper=100> wins[n_s, n_t]; // Gains
+  real<lower=0> OC_time[n_s];             // GamTest parameters
+  real<lower=0> OC_money[n_s]; 
+  real<lower=0> NC_money[n_s]; 
+  real<lower=0> NC_social[n_s]; 
+  real<lower=0> g_emotion[n_s]; 
+}
+
+parameters {
+  // Individual-level paramters    
+  real A_ind_pr[n_s]; 
+  real w_ind_pr[n_s]; 
+  real a_ind_pr[n_s];   
+  real c_ind_pr[n_s]; 
+  
+  // Parameters OCtime
+  real A_OCtime;
+  real intercept_OCtime;
+  real w_OCtime;
+  real a_OCtime;
+  real c_OCtime;
+  real<lower=0> sigma_OCtime;
+    // Parameters OCmoney
+  real A_OCmoney;
+  real intercept_OCmoney;
+  real w_OCmoney;
+  real a_OCmoney;
+  real c_OCmoney;
+  real<lower=0> sigma_OCmoney;
+    // Parameters NCmoney
+  real A_NCmoney;
+  real intercept_NCmoney;
+  real w_NCmoney;
+  real a_NCmoney;
+  real c_NCmoney;
+  real<lower=0> sigma_NCmoney;
+    // Parameters NCsocial
+  real A_NCsocial;
+  real intercept_NCsocial;
+  real w_NCsocial;
+  real a_NCsocial;
+  real c_NCsocial;
+  real<lower=0> sigma_NCsocial;
+    // Parameters gemotion
+  real A_gemotion;
+  real intercept_gemotion;
+  real w_gemotion;
+  real a_gemotion;
+  real c_gemotion;
+  real<lower=0> sigma_gemotion;
+}
+
+transformed parameters {
+  
+  // Individual-level paramters    
+  real<lower=0,upper=1> A_ind[n_s]; 
+  real<lower=0,upper=5> w_ind[n_s]; 
+  real<lower=0,upper=1> a_ind[n_s];   
+  real<lower=0,upper=5> c_ind[n_s];   
+  
+  for (s in 1:n_s)
+  {
+    A_ind[s] = Phi(A_ind_pr[s]);
+    w_ind[s] = Phi(w_ind_pr[s]) * 5;
+    a_ind[s] = Phi(a_ind_pr[s]); 
+    c_ind[s] = Phi(c_ind_pr[s]) * 5;  
+  }
+  
+}
+
+model {
+  vector[4] p;
+  real Ev[4];
+  real dummy[4];
+  real theta;
+  real v1;
+  real v2;
+  real v;
+
+  // Individual-level parameters
+  for (s in 1:n_s)
+  {
+    A_ind_pr[s] ~ normal(0, 1);      
+    w_ind_pr[s] ~ normal(0, 1);   
+    a_ind_pr[s] ~ normal(0, 1);   
+    c_ind_pr[s] ~ normal(0, 1);    
+  }
+    
+  for (s in 1 : n_s)  // loop over subjects
+  {  
+    theta = pow(3, c_ind[s]) - 1;     
+   
+   // Trial 1
+    for (d in 1 : 4)  // loop over decks
+    {  
+      p[d] = .25;
+      Ev[d] = 0;
+    }  
+    choice[s,1] ~ categorical(p);
+
+    // Remaining trials
+    for (t in 1 : (n_t - 1))  
+    { 
+        v1 = pow(wins[s,t], A_ind[s]);
+      
+        v2 = -1 * w_ind[s] * pow(loss[s,t], A_ind[s]);
+        v = v1 + v2;
+
+      Ev[choice[s,t]] = (1 - a_ind[s]) * Ev[choice[s,t]] + a_ind[s] * v;      
+
+      for (d in 1 : 4)  // loop over decks
+        dummy[d] = exp(fmax(fmin(Ev[d] * theta, 450), -450));       
+      
+      for (d in 1 : 4)  // loop over decks
+        p[d] = dummy[d] / sum(dummy); 
+          
+      choice[s, t + 1] ~ categorical(p);
+    }
+  }
+
+ // Priors OCtime
+  intercept_OCtime ~ normal(0, 1);
+  A_OCtime ~ normal(0, 1);
+  w_OCtime ~ normal(0, 1);
+  a_OCtime ~ normal(0, 1);
+  c_OCtime ~ normal(0, 1);
+  sigma_OCtime ~ uniform(0, 3);
+ // Priors OCmoney
+  intercept_OCmoney ~ normal(0, 1);
+  A_OCmoney ~ normal(0, 1);
+  w_OCmoney ~ normal(0, 1);
+  a_OCmoney ~ normal(0, 1);
+  c_OCmoney ~ normal(0, 1);
+  sigma_OCmoney ~ uniform(0, 3);
+ // Priors NCmoney
+  intercept_NCmoney ~ normal(0, 1);
+  A_NCmoney ~ normal(0, 1);
+  w_NCmoney ~ normal(0, 1);
+  a_NCmoney ~ normal(0, 1);
+  c_NCmoney ~ normal(0, 1);
+  sigma_NCmoney ~ uniform(0, 3);  
+ // Priors NCsocial
+  intercept_NCsocial ~ normal(0, 1);
+  A_NCsocial ~ normal(0, 1);
+  w_NCsocial ~ normal(0, 1);
+  a_NCsocial ~ normal(0, 1);
+  c_NCsocial ~ normal(0, 1);
+  sigma_NCsocial ~ uniform(0, 3);  
+ // Priors gemotion
+  intercept_gemotion ~ normal(0, 1);
+  A_gemotion ~ normal(0, 1);
+  w_gemotion ~ normal(0, 1);
+  a_gemotion ~ normal(0, 1);
+  c_gemotion ~ normal(0, 1);
+  sigma_gemotion ~ uniform(0, 3);  
+
+  
+  for (s in 1:n_s)
+  {
+  OC_time[s] ~ normal(intercept_OCtime+A_OCtime*A_ind[s]+w_OCtime*w_ind[s]+a_OCtime*a_ind[s]+c_OCtime*c_ind[s], sigma_OCtime);
+  }
+  for (s in 1:n_s)
+  {
+  OC_money[s] ~ normal(intercept_OCmoney+A_OCmoney*A_ind[s]+w_OCmoney*w_ind[s]+a_OCmoney*a_ind[s]+c_OCmoney*c_ind[s], sigma_OCmoney);
+  }
+  for (s in 1:n_s){
+  NC_money[s] ~ normal(intercept_NCmoney+A_NCmoney*A_ind[s]+w_NCmoney*w_ind[s]+a_NCmoney*a_ind[s]+c_NCmoney*c_ind[s], sigma_NCmoney);
+  }
+  
+  for (s in 1:n_s){
+  NC_social[s] ~ normal(intercept_NCsocial+A_NCsocial*A_ind[s]+w_NCsocial*w_ind[s]+a_NCsocial*a_ind[s]+c_NCsocial*c_ind[s], sigma_NCsocial);
+  }
+  
+  for (s in 1:n_s){
+  g_emotion[s] ~ normal(intercept_gemotion+A_gemotion*A_ind[s]+w_gemotion*w_ind[s]+a_gemotion*a_ind[s]+c_gemotion*c_ind[s], sigma_gemotion);
+  }
+}
+
+
+generated quantities{
+  real OC_time_gen[n_s];
+  real OC_money_gen[n_s];
+  real NC_money_gen[n_s];
+  real NC_social_gen[n_s];
+  real g_emotion_gen[n_s];
+  
+  for (s in 1:n_s)
+  {
+  OC_time_gen[s] = normal_rng(intercept_OCtime+A_OCtime*A_ind[s]+w_OCtime*w_ind[s]+a_OCtime*a_ind[s]+c_OCtime*c_ind[s], sigma_OCtime);
+  }
+  for (s in 1:n_s)
+  {
+  OC_money_gen[s] = normal_rng(intercept_OCmoney+A_OCmoney*A_ind[s]+w_OCmoney*w_ind[s]+a_OCmoney*a_ind[s]+c_OCmoney*c_ind[s], sigma_OCmoney);
+  }
+  for (s in 1:n_s){
+  NC_money_gen[s] = normal_rng(intercept_NCmoney+A_NCmoney*A_ind[s]+w_NCmoney*w_ind[s]+a_NCmoney*a_ind[s]+c_NCmoney*c_ind[s], sigma_NCmoney);
+  }
+  
+  for (s in 1:n_s){
+  NC_social_gen[s] = normal_rng(intercept_NCsocial+A_NCsocial*A_ind[s]+w_NCsocial*w_ind[s]+a_NCsocial*a_ind[s]+c_NCsocial*c_ind[s], sigma_NCsocial);
+  }
+  
+ for (s in 1:n_s){
+  g_emotion_gen[s] = normal_rng(intercept_gemotion+A_gemotion*A_ind[s]+w_gemotion*w_ind[s]+a_gemotion*a_ind[s]+c_gemotion*c_ind[s], sigma_gemotion);
+  }
+}
